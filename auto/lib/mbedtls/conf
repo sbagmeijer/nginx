@@ -1,0 +1,70 @@
+
+# Copyright (C) Igor Sysoev
+# Copyright (C) Nginx, Inc.
+
+
+if [ $MBEDTLS != NONE ]; then
+
+    case "$CC" in
+
+        cl | bcc32)
+            # Someone that cares should support windows.
+
+cat << END
+
+$0: error: Ngnix's mbed TLS support requires a non-cl/bcc32 compiler.
+The build infrastructure for mbed TKS support has not been written for cl or
+bcc32.  You can either use GCC or try using OpenSSL instead.
+
+END
+            exit 1
+        ;;
+
+        *)
+            have=NGX_MBEDTLS . auto/have
+            have=NGX_SSL . auto/have
+
+            CORE_INCS="$CORE_INCS $MBEDTLS/.mbedtls/include"
+            CORE_DEPS="$CORE_DEPS $MBEDTLS/.mbedtls/include/mbedtls/config.h"
+            CORE_LIBS="$CORE_LIBS $MBEDTLS/.mbedtls/lib/libmbedtls.a"
+            CORE_LIBS="$CORE_LIBS $NGX_LIBDL"
+        ;;
+    esac
+
+else
+
+    if [ "$NGX_PLATFORM" != win32 ]; then
+
+        MBEDTLS=NO
+
+        ngx_feature="mbed TLS library"
+        ngx_feature_name="NGX_MBEDTLS"
+        ngx_feature_run=no
+        ngx_feature_incs="#include <mbedtls/config.h>
+                          #include <mbedtls/ssl.h>"
+        ngx_feature_path=
+        ngx_feature_libs="-lmbedtls"
+        ngx_feature_test="ssl_context c; ssl_init(&c);"
+        . auto/feature
+
+        if [ $ngx_found = yes ]; then
+            have=NGX_SSL . auto/have
+            CORE_LIBS="$CORE_LIBS $ngx_feature_libs $NGX_LIBDL"
+            MBEDTLS=YES
+        fi
+    fi
+
+    if [ $MBEDTLS != YES ]; then
+
+cat << END
+
+$0: error: SSL modules require the mbed TLS library.
+You can either do not enable the modules, or install the mbed TLS library
+into the system, or build the mbed TLS library statically from the source
+with nginx by using --with-mbedtls=<path> option.
+
+END
+        exit 1
+    fi
+
+fi
